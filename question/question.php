@@ -329,7 +329,7 @@ if ($mform->is_cancelled()) {
 
                 $local_form_copy->id = 0;
                 $local_form_copy->name =  $local_question_to_save->name;
-                $qtypeobj->save_question($local_question_to_save, $local_form_copy);            
+                $qtypeobj->save_question($local_question_to_save, $local_form_copy);                  
             }
         }
         else if($count == $copycount) {            
@@ -358,6 +358,21 @@ if ($mform->is_cancelled()) {
         $synccopies =  $DB->get_records('question', array('name' => 'synccopy of '.$questionToCopy->name), 'id');
         
         foreach ($synccopies as $copyentry) {
+
+            array_push($fromform_clone_for_sync->tags, "synccopy");
+            if (isset($fromform_clone_for_sync->tags)) {
+                // If we have any question context level tags then set those tags now.
+                core_tag_tag::set_item_tags('core_question', 'question', $copyentry->id,
+                        context::instance_by_id($contextid), $fromform_clone_for_sync->tags, 0);
+            }
+        
+            if (isset($fromform_clone_for_sync->coursetags)) {
+                // If we have and course context level tags then set those now.
+                core_tag_tag::set_item_tags('core_question', 'question', $copyentry->id,
+                        context_course::instance($fromform_clone_for_sync->courseid), $fromform_clone_for_sync->coursetags, 0);
+            }
+
+
             // delete old seeds 
             $DB->delete_records('qtype_stack_deployed_seeds', array("questionid" => $copyentry->id));
         }            
