@@ -219,7 +219,6 @@ if ($cm !== null){
 }
 
 $toform->inpopup = $inpopup;
-
 $mform->set_data($toform);
 
 if ($mform->is_cancelled()) {
@@ -230,6 +229,15 @@ if ($mform->is_cancelled()) {
     }
 
 } else if ($fromform = $mform->get_data()) {
+
+    if (!empty($fromform->updatecopies)) {
+        // $fromform gets changed in the save process (properties are deleted)
+        // I think we could call $mform->get_data() to create a new table, or we could use the function clone 
+        // probably does not make a difference other than the the changes would be more local
+        $fromform_clone_for_sync = fullclone($fromform);
+        $question_old_name = $question->name;
+    }
+
     // If we are saving as a copy, break the connection to the old question.
     if ($makecopy) {
         $question->id = 0;
@@ -295,6 +303,85 @@ if ($mform->is_cancelled()) {
     if (!empty($fromform->updatebutton)) {
         $url->param('id', $question->id);
         $url->remove_params('makecopy');
+        redirect($url);
+    }
+
+    if (!empty($fromform->updatecopies)) {
+
+        //    if ($collision = $DB->get_record_select('user', "username = :username AND mnethostid = :mnethostid AND auth <> :auth", 
+        //array('username'=>$user->username, 'mnethostid'=>$CFG->mnet_localhost_id, 'auth'=>$this->authtype), 'id,username,auth')) {
+        
+        if (!$questionToCopy = $DB->get_record('question', array('id' => $id))) {
+            print_error('questiondoesnotexist', 'question', $returnurl);
+        }
+
+        $synccopies =  $DB->get_records('question', array('name' => 'synccopy of '.$question_old_name));
+        //$synccopies =  $DB->get_records_select('question', "name ='synccopy of ".$question->name."'",null, 'name,id');
+        $count = count($synccopies);
+
+        $copycount = 4;
+        if($count == 0){
+            for ($x = 1; $x <= $copycount; $x++) {   
+                // create a copy of the form and the question
+                // both could be changed in save_question function                     
+                $local_form_copy = fullclone($fromform_clone_for_sync);
+                $local_question_to_save = fullclone($questionToCopy);
+                
+                $local_question_to_save->name = 'synccopy of '.$questionToCopy->name;
+                $local_question_to_save->idnumber = core_question_find_next_unused_idnumber($question->idnumber, $category->id);
+                $local_question_to_save->id = 0;
+
+                $local_form_copy->id = 0;
+                $local_form_copy->name =  $local_question_to_save->name;
+                $qtypeobj->save_question($local_question_to_save, $local_form_copy);            
+            }
+        }
+        else if($count == $copycount) {            
+            foreach ($synccopies as $copyentry) {
+                // create a copy of the form and the question
+                // both could be changed in save_question function
+                $local_form_copy = fullclone($fromform_clone_for_sync);
+                $local_question_to_save = fullclone($questionToCopy);
+
+                $local_question_to_save->name = 'synccopy of '.$questionToCopy->name;
+                $local_question_to_save->id = $copyentry->id;
+                $local_form_copy->id = $copyentry->id;
+                $local_form_copy->name = $local_question_to_save->name; 
+                $qtypeobj->save_question($local_question_to_save, $local_form_copy);
+            }
+
+            foreach ($synccopies as $copyentry) {
+                question_bank::notify_question_edited($copyentry->id);
+            }            
+        }
+        else {
+            print_error('questioncopyfailed', 'question', $returnurl);      
+        }
+
+        // get sync copies, sort by id for always same seed distribution
+        $synccopies =  $DB->get_records('question', array('name' => 'synccopy of '.$questionToCopy->name), 'id');
+        
+        foreach ($synccopies as $copyentry) {
+            // delete old seeds 
+            $DB->delete_records('qtype_stack_deployed_seeds', array("questionid" => $copyentry->id));
+        }            
+        
+        
+        // query the seeds from original stack question  mdl_qtype_stack_deployed_seeds
+        // sort by id for always same seed distribution
+        $stack_seeds =  $DB->get_records('qtype_stack_deployed_seeds', array('questionid' => $question->id ), 'id' );        
+        reset($synccopies);
+        foreach ($stack_seeds as $stack_seed_entry) {    
+            if(!current($synccopies)){
+                reset($synccopies);
+            }      
+            unset($stack_seed_entry->id);    
+            $stack_seed_entry->questionid =  current($synccopies)->id;
+            $DB->insert_record('qtype_stack_deployed_seeds', $stack_seed_entry);
+            next($synccopies);
+        }
+
+        
         redirect($url);
     }
 

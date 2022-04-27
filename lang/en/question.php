@@ -284,6 +284,7 @@ $string['questionbank'] = 'Question bank';
 $string['questioncategory'] = 'Question category';
 $string['questioncatsfor'] = 'Question categories for \'{$a}\'';
 $string['questiondoesnotexist'] = 'This question does not exist';
+$string['questioncopyfailed'] = 'question copy failed';
 $string['questionname'] = 'Question name';
 $string['questionno'] = 'Question {$a}';
 $string['questionsaveerror'] = 'Errors occur during saving question - ({$a})';

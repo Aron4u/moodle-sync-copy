@@ -255,6 +255,8 @@ abstract class question_edit_form extends question_wizard_form {
         $buttonarray = array();
         $buttonarray[] = $mform->createElement('submit', 'updatebutton',
                              get_string('savechangesandcontinueediting', 'question'));
+        $buttonarray[] = $mform->createElement('submit', 'updatecopies',
+                             "Copy / apply changes to all copies this question");
         if ($this->can_preview()) {
             $previewlink = $PAGE->get_renderer('core_question')->question_preview_link(
                     $this->question->id, $this->context, true);
